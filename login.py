@@ -1,116 +1,149 @@
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-import time 
-from selenium.webdriver.support.ui import Select
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import pytest
 
-#create an instance of web driver for a browser to launch a browser window
-driver=webdriver.Edge()
 
-#Visit a URL
-driver.get("https://www.saucedemo.com")
+# FIXTURE: Browser Setup and Teardown
 
-#Login with valid credentials
-username= driver.find_element(By.ID, "user-name")
-username.send_keys("standard_user")
+@pytest.fixture
+def driver():
 
-password= driver.find_element(By.ID, "password")
-password.send_keys("secret_sauce")
+    driver = webdriver.Edge()
+    driver.maximize_window()
+    driver.get("https://www.saucedemo.com/")
 
-login_button=driver.find_element(By.ID, "login-button")
-login_button.click()
-time.sleep(3)
+    print("Browser launched")
 
-#Login with empty username and empty password
+    yield driver
 
-username= driver.find_element(By.ID, "user-name")
-username.send_keys("")
+    driver.quit()
+    print("Browser closed")
 
-password= driver.find_element(By.ID, "password")
-password.send_keys("")
 
-login_button=driver.find_element(By.ID, "login-button")
-login_button.click()
-time.sleep(3)
+# REUSABLE FUNCTION: Login
 
-#Login with empty username and valid password
-username= driver.find_element(By.ID, "user-name")
-username.send_keys("")
+def perform_login(driver, username, password):
 
-password= driver.find_element(By.ID, "password")
-password.send_keys("secret_sauce")
+    driver.find_element(By.ID, "user-name").send_keys(username)
+    driver.find_element(By.ID, "password").send_keys(password)
+    driver.find_element(By.ID, "login-button").click()
 
-login_button=driver.find_element(By.ID, "login-button")
-login_button.click()
-time.sleep(3)
 
-#Login with empty username and invalid password
-username= driver.find_element(By.ID, "user-name")
-username.send_keys("")
+# REUSABLE FUNCTION: Get Error Message
 
-password= driver.find_element(By.ID, "password")
-password.send_keys("sauce")
+def get_error_message(driver):
 
-login_button=driver.find_element(By.ID, "login-button")
-login_button.click()
-time.sleep(3)
+    error_message = WebDriverWait(driver, 10).until(
+        EC.visibility_of_element_located(
+            (By.CSS_SELECTOR, "h3[data-test='error']")
+        )
+    )
 
-#Login with invalid username and empty password
-username= driver.find_element(By.ID, "user-name")
-username.send_keys("demo")
+    return error_message.text
 
-password= driver.find_element(By.ID, "password")
-password.send_keys("")
 
-login_button=driver.find_element(By.ID, "login-button")
-login_button.click()
-time.sleep(3)   #Error message should be username is invalid
+# TEST CASE 1: Valid Username and Valid Password
 
-#Login with invalid username and invalid password
-username= driver.find_element(By.ID, "user-name")
-username.send_keys("demo")
+def test_valid_login(driver):
 
-password= driver.find_element(By.ID, "password")
-password.send_keys("sauce")
+    perform_login(driver, "standard_user", "secret_sauce")
 
-login_button=driver.find_element(By.ID, "login-button")
-login_button.click()
-time.sleep(3)
+    assert "inventory.html" in driver.current_url
 
-#Verify password field is masked
-password = driver.find_element(By.ID, "password")
+    print("TC-01: Valid login -> PASSED")
 
-password.send_keys("secret_sauce")
 
-password_type = password.get_attribute("type")
+# TEST CASE 2: Locked Out User
 
-assert password_type == "password"
+def test_locked_out_user(driver):
 
-print("Test Passed: Password field is masked")
-time.sleep(3)
+    perform_login(driver, "locked_out_user", "secret_sauce")
 
-#...............................................
-#To validtate "Show Password" icon is working
-# Locate password field
-# password = driver.find_element(By.ID, "password")
-# password.send_keys("secret_sauce")
+    error_message = get_error_message(driver)
 
-# Step 1: Verify Show Password icon is visible
-#show_password = driver.find_element(By.ID, "show-password")
+    assert "locked out" in error_message.lower()
 
-# assert show_password.is_displayed()
-# print("Pass: Show Password icon is visible")
+    print("TC-02: Locked out user -> PASSED")
 
-# # Step 2: Verify icon is clickable
-# assert show_password.is_enabled()
-# print("Pass: Show Password icon is clickable")
 
-# # Step 3: Click the Show Password icon
-# show_password.click()
+# TEST CASE 3: Empty Username and Empty Password
 
-# # Verify password is unmasked
-# password_type = password.get_attribute("type")
+def test_empty_username_empty_password(driver):
 
-# assert password_type == "text"
-# print("Pass: Password is unmasked")
+    perform_login(driver, "", "")
 
-#hiii this is second commit
+    error_message = get_error_message(driver)
+
+    assert "Username is required" in error_message
+
+    print("TC-03: Empty username and password -> PASSED")
+
+
+# TEST CASE 4: Empty Username and Valid Password
+
+def test_empty_username_valid_password(driver):
+
+    perform_login(driver, "", "secret_sauce")
+
+    error_message = get_error_message(driver)
+
+    assert "Username is required" in error_message
+
+    print("TC-04: Empty username and valid password -> PASSED")
+
+
+# TEST CASE 5: Empty Username and Invalid Password
+
+def test_empty_username_invalid_password(driver):
+
+    perform_login(driver, "", "sauce")
+
+    error_message = get_error_message(driver)
+
+    assert "Username is required" in error_message
+
+    print("TC-05: Empty username and invalid password -> PASSED")
+
+
+# TEST CASE 6: Invalid Username and Empty Password
+
+def test_invalid_username_empty_password(driver):
+
+    perform_login(driver, "demo", "")
+
+    error_message = get_error_message(driver)
+
+    assert "Password is required" in error_message
+
+    print("TC-06: Invalid username and empty password -> PASSED")
+
+
+# TEST CASE 7: Invalid Username and Invalid Password
+
+def test_invalid_username_invalid_password(driver):
+
+    perform_login(driver, "demo", "sauce")
+
+    error_message = get_error_message(driver)
+
+    assert "do not match any user" in error_message
+
+    print("TC-07: Invalid username and password -> PASSED")
+
+
+# TEST CASE 8: Verify Password Field Is Masked
+
+def test_password_field_masked(driver):
+
+    password = driver.find_element(By.ID, "password")
+
+    password.send_keys("secret_sauce")
+
+    password_type = password.get_attribute("type")
+
+    assert password_type == "password"
+
+    print("TC-08: Password field is masked -> PASSED")
